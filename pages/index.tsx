@@ -29,7 +29,7 @@ const Home = () => {
       <p>
         WTON address:{" "}
         <a
-          href={`https://sepolia.etherscan.io/token/${tokenWTON}`}
+          href={`https://testnet.bscscan.com/address/${tokenWTON}`}
           target="_blank"
           rel="noopener noreferrer"
         >
