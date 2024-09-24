@@ -12,7 +12,9 @@ import {
   List,
   Loader,
 } from "semantic-ui-react";
-import { useContract, useSigner } from "wagmi";
+import { getContract } from "viem";
+import { useWalletClient } from "wagmi";
+// import { useContract, useSigner } from "wagmi";
 
 const apiRoot = process.env.NEXT_PUBLIC_TRUSTLESS_BACKEND_URL;
 
@@ -94,18 +96,31 @@ const ProcessTransfer: FC<ProcessTransferProps> = ({
   const isShardBlockReady = !shardBlock || shardBlock?.checked;
   const isTxReadyForValidate = isMcBlockReady && isShardBlockReady;
 
-  const provider = useSigner();
-  const bridgeContract = useContract({
-    address: process.env.NEXT_PUBLIC_ETH_BRIDGE_ADDR,
-    abi: bridgeAbi,
-    signerOrProvider: provider.data,
-  });
+  const { data: walletClient } = useWalletClient();
 
-  const validatorContract = useContract({
-    address: process.env.NEXT_PUBLIC_ETH_VALIDATOR_ADDR,
-    abi: validatorAbi,
-    signerOrProvider: provider.data,
-  });
+  const bridgeContract = useMemo(() => {
+    if (!walletClient) {
+      return undefined;
+    }
+
+    return getContract({
+      address: process.env.NEXT_PUBLIC_ETH_BRIDGE_ADDR as `0x${string}`,
+      abi: bridgeAbi,
+      client: walletClient,
+    });
+  }, [walletClient]);
+
+  const validatorContract = useMemo(() => {
+    if (!walletClient) {
+      return undefined;
+    }
+
+    return getContract({
+      address: process.env.NEXT_PUBLIC_ETH_VALIDATOR_ADDR as `0x${string}`,
+      abi: validatorAbi,
+      client: walletClient,
+    });
+  }, [walletClient]);
 
   useEffect(() => {
     if (txHash && !currentTx) {
@@ -150,16 +165,16 @@ const ProcessTransfer: FC<ProcessTransferProps> = ({
                 subArr.push(signatures[0]);
               }
 
-              await validatorContract
-                .verifyValidators(
+              await validatorContract.write
+                .verifyValidators([
                   "0x" + blockData.id.root_hash,
                   `0x${blockData.id.file_hash}`,
                   subArr.map((c: any) => ({
                     node_id: `0x${c.node_id}`,
                     r: `0x${c.r}`,
                     s: `0x${c.s}`,
-                  })) as any[5]
-                )
+                  })),
+                ])
                 .then((tx: any) => (tx as any).wait());
 
               setMcBlockSteps((state) => ({
@@ -168,8 +183,8 @@ const ProcessTransfer: FC<ProcessTransferProps> = ({
               }));
             }
 
-            await validatorContract
-              .addCurrentBlockToVerifiedSet("0x" + blockData.id.root_hash)
+            await validatorContract.write
+              .addCurrentBlockToVerifiedSet(["0x" + blockData.id.root_hash])
               .then((tx: any) => (tx as any).wait());
 
             setMcBlockSteps((state) => ({
@@ -193,8 +208,8 @@ const ProcessTransfer: FC<ProcessTransferProps> = ({
         });
 
         try {
-          await validatorContract
-            .parseShardProofPath(Buffer.from(bocProof, "base64"))
+          await validatorContract.write
+            .parseShardProofPath([Buffer.from(bocProof, "base64")])
             .then((tx: any) => (tx as any).wait());
 
           await axios.post(apiRoot + "/validator/checkshard", {
@@ -234,15 +249,16 @@ const ProcessTransfer: FC<ProcessTransferProps> = ({
         boc: Buffer.from(txValidateParams.boc, "hex"),
         adapter: txValidateParams.adapter,
       });
-      const txRes = await bridgeContract.readTransaction(
+      const txRes = await bridgeContract.read.readTransaction([
         Buffer.from(txValidateParams.txBoc, "hex"),
         Buffer.from(txValidateParams.boc, "hex"),
         txValidateParams.adapter,
-        operationType
-      );
+        operationType,
+      ]);
       console.log("tx completed", txRes);
 
-      onComplete(txRes.hash);
+      // @ts-ignore
+      onComplete(txRes?.hash || txRes);
     } catch (error) {
       console.log(error);
     } finally {

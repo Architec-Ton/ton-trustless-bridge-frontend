@@ -1,5 +1,6 @@
 import { TonConnectButton } from "@tonconnect/ui-react";
-import { Web3Button } from "@web3modal/react";
+
+import { ConnectKitButton } from "connectkit";
 import Link from "next/link";
 import { FC, HTMLAttributes } from "react";
 import { Container, Menu, Segment } from "semantic-ui-react";
@@ -22,7 +23,7 @@ const Layout: FC<LayoutProps> = ({ children }) => {
               Transactions
             </Menu.Item>
             <div className="ml-auto my-auto">
-              <Web3Button />
+              <ConnectKitButton />
             </div>
             <TonConnectButton className="ml-6 my-auto" />
           </Container>
