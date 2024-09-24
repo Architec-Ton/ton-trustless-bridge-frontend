@@ -1,15 +1,15 @@
 // 0x3b93c826e9a85eb2235f8e3042b80b279d642f3d02a674f11bd44b6566c7f20c
 
 import { BridgeOpCodes } from "@/artifacts/ton/bridge/op-codes";
-import { tonRawBlockchainApi } from "@/services";
 import { sleep } from "@/utils";
 import { IReceiptJSON, Receipt } from "@/utils/evm-data/receipt";
 import { Base64 } from "@tonconnect/protocol";
 import { useTonConnectUI } from "@tonconnect/ui-react";
 import { FC, HTMLAttributes, useEffect, useState } from "react";
 import { Button, Container, Dimmer, List, Loader } from "semantic-ui-react";
-import { Address, Cell, beginCell, toNano } from "ton-core";
-import { useProvider } from "wagmi";
+import { Cell, beginCell, toNano } from "ton-core";
+import { getTransactionReceipt } from "viem/actions";
+import { useWalletClient } from "wagmi";
 
 export const Opcodes = {
   run_ssz: 0x86f1bcc5,
@@ -90,13 +90,16 @@ export function SSZByteVectorTypeToCell(
   const chunks = splitIntoRootChunks(uint8Arr)
     .reverse()
     .map((chunk: any) => beginCell().storeBuffer(Buffer.from(chunk)))
-    .reduce((acc, memo, index) => {
-      if (index === 0) {
-        return memo.endCell();
-      }
+    .reduce(
+      (acc, memo, index) => {
+        if (index === 0) {
+          return memo.endCell();
+        }
 
-      return memo.storeRef(acc).endCell();
-    }, undefined as any as Cell);
+        return memo.storeRef(acc).endCell();
+      },
+      undefined as any as Cell
+    );
 
   // console.log('value', value);
   // console.log('uint8arr', uint8Arr);
@@ -206,7 +209,7 @@ const ProcessTransferEth: FC<ProcessTransferEthProps> = ({
   txHash,
   onComplete,
 }) => {
-  const provider_api = useProvider();
+  const { data: walletClient } = useWalletClient();
   const [tonConnectUI] = useTonConnectUI();
   const [pending, setPending] = useState(true);
 
@@ -239,8 +242,10 @@ const ProcessTransferEth: FC<ProcessTransferEthProps> = ({
     if (!txHash) {
       return;
     }
-    const rec_res = await provider_api.getTransactionReceipt(txHash);
-    rec_res.cumulativeGasUsed = rec_res.cumulativeGasUsed._hex as any;
+    const rec_res = await getTransactionReceipt(walletClient!, {
+      hash: txHash as `0x${string}`,
+    });
+    rec_res.cumulativeGasUsed = rec_res.cumulativeGasUsed;
     console.log(rec_res);
 
     const r = Receipt.fromJSON(
@@ -287,15 +292,15 @@ const ProcessTransferEth: FC<ProcessTransferEthProps> = ({
     }
 
     for (let i = 0; i < optimistics.length; i++) {
-      const { transactions: beforeTxs } =
-        await tonRawBlockchainApi.blockchain.getBlockchainAccountTransactions(
-          Address.parse(
-            process.env.NEXT_PUBLIC_TON_VALIDATOR_ADDR!
-          ).toRawString(),
-          { limit: 1 }
-        );
-      const lastTx = beforeTxs[0];
-      const lastTxHash = lastTx.hash;
+      // const { transactions: beforeTxs } =
+      //   await tonRawBlockchainApi.blockchain.getBlockchainAccountTransactions(
+      //     Address.parse(
+      //       process.env.NEXT_PUBLIC_TON_VALIDATOR_ADDR!
+      //     ).toRawString(),
+      //     { limit: 1 }
+      //   );
+      // const lastTx = beforeTxs[0];
+      // const lastTxHash = lastTx.hash;
 
       const tonTx = await tonConnectUI.sendTransaction({
         validUntil: Date.now() + 1000000,
@@ -308,18 +313,18 @@ const ProcessTransferEth: FC<ProcessTransferEthProps> = ({
         ],
       });
 
-      let txHash = lastTxHash;
-      while (txHash == lastTxHash) {
-        await sleep(5000);
-        let txs =
-          await tonRawBlockchainApi.blockchain.getBlockchainAccountTransactions(
-            Address.parse(
-              process.env.NEXT_PUBLIC_TON_VALIDATOR_ADDR!
-            ).toRawString(),
-            { limit: 1 }
-          );
-        txHash = txs.transactions[0].hash;
-      }
+      // let txHash = lastTxHash;
+      // while (txHash == lastTxHash) {
+      //   await sleep(5000);
+      //   let txs =
+      //     await tonRawBlockchainApi.blockchain.getBlockchainAccountTransactions(
+      //       Address.parse(
+      //         process.env.NEXT_PUBLIC_TON_VALIDATOR_ADDR!
+      //       ).toRawString(),
+      //       { limit: 1 }
+      //     );
+      //   txHash = txs.transactions[0].hash;
+      // }
     }
     await updateDate();
   };
@@ -361,6 +366,7 @@ const ProcessTransferEth: FC<ProcessTransferEthProps> = ({
 
   useEffect(() => {
     updateDate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (

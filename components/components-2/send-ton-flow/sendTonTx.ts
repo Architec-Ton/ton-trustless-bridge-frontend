@@ -1,11 +1,9 @@
 import { BridgeOpCodes } from "@/artifacts/ton/bridge/op-codes";
-import { tonRawBlockchainApi } from "@/services";
 import { TxReq } from "@/types";
-import { sleep } from "@/utils";
 import { Base64 } from "@tonconnect/protocol";
 import { useTonAddress, useTonConnectUI } from "@tonconnect/ui-react";
 import { Dispatch, SetStateAction } from "react";
-import { Address, beginCell, toNano } from "ton-core";
+import { beginCell, toNano } from "ton-core";
 
 export const buildSendTonTx = (address: bigint, tonsToWrap: string) => {
   return Base64.encode(
@@ -44,42 +42,48 @@ export const useSendTonTx = (
   };
 
   const onFormSubmit = async (ethAddr: string, tonsToWrap: string) => {
-    const { transactions: beforeTxs } =
-      await tonRawBlockchainApi.blockchain.getBlockchainAccountTransactions(
-        Address.parse(process.env.NEXT_PUBLIC_TON_BRIDGE_ADDR!).toRawString(),
-        { limit: 20 }
-      );
+    // const { transactions: beforeTxs } =
+    //   await tonRawBlockchainApi.blockchain.getBlockchainAccountTransactions(
+    //     Address.parse(process.env.NEXT_PUBLIC_TON_BRIDGE_ADDR!).toRawString(),
+    //     { limit: 20 }
+    //   );
 
-    await sendWrap(BigInt(ethAddr), tonsToWrap);
-    let found = false;
-    let attempts = 0;
-    while (!found && attempts < 10) {
-      const txs = (
-        await await tonRawBlockchainApi.blockchain.getBlockchainAccountTransactions(
-          Address.parse(process.env.NEXT_PUBLIC_TON_BRIDGE_ADDR!).toRawString(),
-          { limit: 20 }
-        )
-      ).transactions.filter((tx) => {
-        return !beforeTxs.find((beforeTx) => beforeTx.hash === tx.hash);
-      });
-      if (txs.length) {
-        const tx = txs.find((tx) => {
-          const addr = tx.in_msg?.source?.address;
-          if (!addr) return false;
-          return Address.parse(addr).equals(Address.parse(myTonAddrRaw));
-        });
-        if (tx) {
-          found = true;
-          const addr = Address.parse(tx.account.address);
-          const lt = tx.lt;
-          const workchain = addr.workChain;
-          setTxHash({ hash: tx.hash, lt, workchain });
-          console.log(tx); // !!!!!
-        }
-      }
-      attempts += 1;
-      await sleep(4000);
+    try {
+      await sendWrap(BigInt(ethAddr), tonsToWrap);
+      setTxHash({ hash: "nothing", lt: 0, workchain: 0 });
+    } catch (err) {
+      console.error("sendWrap error: ", err);
     }
+
+    // let found = false;
+    // let attempts = 0;
+    // while (!found && attempts < 10) {
+    //   const txs = (
+    //     await await tonRawBlockchainApi.blockchain.getBlockchainAccountTransactions(
+    //       Address.parse(process.env.NEXT_PUBLIC_TON_BRIDGE_ADDR!).toRawString(),
+    //       { limit: 20 }
+    //     )
+    //   ).transactions.filter((tx) => {
+    //     return !beforeTxs.find((beforeTx) => beforeTx.hash === tx.hash);
+    //   });
+    //   if (txs.length) {
+    //     const tx = txs.find((tx) => {
+    //       const addr = tx.in_msg?.source?.address;
+    //       if (!addr) return false;
+    //       return Address.parse(addr).equals(Address.parse(myTonAddrRaw));
+    //     });
+    //     if (tx) {
+    //       found = true;
+    //       const addr = Address.parse(tx.account.address);
+    //       const lt = tx.lt;
+    //       const workchain = addr.workChain;
+    //       setTxHash({ hash: tx.hash, lt, workchain });
+    //       console.log(tx); // !!!!!
+    //     }
+    //   }
+    //   attempts += 1;
+    //   await sleep(4000);
+    // }
   };
 
   return {

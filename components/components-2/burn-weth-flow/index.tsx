@@ -2,9 +2,11 @@ import { bridgeAbi } from "@/artifacts/eth/bridge/bridge";
 import ProcessTransfer from "@/components/process-transfer";
 import TakeWton from "@/components/take-wton";
 import { TxReq } from "@/types";
-import { FC, HTMLAttributes, SetStateAction, useState } from "react";
+import { FC, HTMLAttributes, SetStateAction, useMemo, useState } from "react";
 import { Container, Tab } from "semantic-ui-react";
-import { useContract, useProvider, useSigner } from "wagmi";
+
+import { getContract } from "viem";
+import { useWalletClient } from "wagmi";
 import LoadByTonTxForm from "../load-by-ton-tx-form";
 import SendToTonForm from "../send-to-ton-form";
 import { useBurnTonTx } from "./burnWethTx";
@@ -20,13 +22,18 @@ const BurnWethFlow: FC<BurnWethFlowProps> = ({ setStep, step, baseCoin }) => {
   const [ethTxHash, setEthTxHash] = useState<string>();
   const { onFormSubmit } = useBurnTonTx(setTestHash);
 
-  const provider = useSigner();
-  const provider_api = useProvider();
-  const bridgeContract = useContract({
-    address: process.env.NEXT_PUBLIC_ETH_BRIDGE_ADDR,
-    abi: bridgeAbi,
-    signerOrProvider: provider.data,
-  });
+  const { data: walletClient } = useWalletClient();
+  const bridgeContract = useMemo(() => {
+    if (!walletClient) {
+      return undefined;
+    }
+
+    return getContract({
+      address: process.env.NEXT_PUBLIC_ETH_BRIDGE_ADDR as `0x${string}`,
+      abi: bridgeAbi,
+      client: walletClient,
+    });
+  }, [walletClient]);
 
   return (
     <>
