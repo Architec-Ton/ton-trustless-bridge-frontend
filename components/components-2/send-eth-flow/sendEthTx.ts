@@ -28,11 +28,10 @@ export const useSendEthTx = (
       return;
     }
     const addrHash = Address.parse(tonAddr).hash.toString("hex");
-    const txHash = await bridgeContract.write.swapETH([
-      `0x${addrHash}`,
-      process.env.NEXT_PUBLIC_ETH_ADAPTER_ADDR,
-      { value: parseEther(ethsToWrap) },
-    ]);
+    const txHash = await bridgeContract.write.swapETH(
+      [`0x${addrHash}`, process.env.NEXT_PUBLIC_ETH_ADAPTER_ADDR],
+      { value: parseEther(ethsToWrap) }
+    );
 
     setEthHash(txHash);
 
